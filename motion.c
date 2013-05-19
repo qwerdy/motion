@@ -2128,6 +2128,22 @@ static void *motion_loop(void *arg)
             else
                 cnt->locate_motion_style = LOCATE_BOX;
 
+            /* Want to change log_level? 
+             * -1 to make syslog compatible
+            */
+            if (cnt_list[0]->conf.log_level-1 != cnt_list[0]->log_level &&
+                cnt_list[0]->conf.log_level-1 < ALL) {
+                    cnt_list[0]->log_level = cnt_list[0]->conf.log_level - 1;
+                    set_log_level(cnt_list[0]->log_level);
+            }
+
+            /* Want to change log_type? */
+            if (cnt_list[0]->conf.log_type != cnt_list[0]->log_type &&
+                cnt_list[0]->conf.log_type != 0) {
+                    cnt_list[0]->log_type = cnt_list[0]->conf.log_type;
+                    set_log_type(cnt_list[0]->log_type);
+            }
+
             /* Sanity check for smart_mask_speed, silly value disables smart mask */
             if (cnt->conf.smart_mask_speed < 0 || cnt->conf.smart_mask_speed > 10)
                 cnt->conf.smart_mask_speed = 0;
@@ -2445,10 +2461,10 @@ static void motion_startup(int daemonize, int argc, char *argv[])
 
     if ((cnt_list[0]->conf.log_level > ALL) ||
         (cnt_list[0]->conf.log_level == 0)) { 
-        cnt_list[0]->conf.log_level = LEVEL_DEFAULT;
-        cnt_list[0]->log_level = cnt_list[0]->conf.log_level;
-        MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO, "%s: Using default log level (%s) (%d)", 
-                   get_log_level_str(cnt_list[0]->log_level), SHOW_LEVEL_VALUE(cnt_list[0]->log_level));
+            cnt_list[0]->conf.log_level = LEVEL_DEFAULT + 1; // syslog / motion compatibility
+            cnt_list[0]->log_level = cnt_list[0]->conf.log_level -1; // syslog / motion compatibility
+            MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO, "%s: Using default log level (%s) (%d)", 
+                        get_log_level_str(cnt_list[0]->log_level), cnt_list[0]->log_level);
     } else {
         cnt_list[0]->log_level = cnt_list[0]->conf.log_level - 1; // Let's make syslog compatible
     }
@@ -2479,12 +2495,10 @@ static void motion_startup(int daemonize, int argc, char *argv[])
         MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO, "%s: Logging to syslog");
     }
 
-    if ((cnt_list[0]->conf.log_type_str == NULL) || 
-        !(cnt_list[0]->log_type = get_log_type(cnt_list[0]->conf.log_type_str))) {
-        cnt_list[0]->log_type = TYPE_DEFAULT;
-        cnt_list[0]->conf.log_type_str = mystrcpy(cnt_list[0]->conf.log_type_str, "ALL");
-        MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO, "%s: Using default log type (%s)",  
-                   get_log_type_str(cnt_list[0]->log_type));
+    if (cnt_list[0]->conf.log_type == 0) {
+            cnt_list[0]->log_type = TYPE_DEFAULT;
+            MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO, "%s: Using default log type (%s)",  
+                        get_log_type_str(cnt_list[0]->log_type));
     }
 
     MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO, "%s: Using log type (%s) log level (%s)", 
