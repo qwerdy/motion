@@ -207,10 +207,10 @@ static void image_save_as_preview(struct context *cnt, struct image_data *img)
 
         if (cnt->locate_motion_style == LOCATE_BOX) {
             alg_draw_location(&img->location, &cnt->imgs, cnt->imgs.width, cnt->imgs.preview_image.image,
-                              LOCATE_BOX, LOCATE_NORMAL, cnt->process_thisframe, 0);
+                              LOCATE_BOX, LOCATE_NORMAL, cnt->process_thisframe, cnt->imgs.preview_image.total_labels);
         } else if (cnt->locate_motion_style == LOCATE_REDBOX) {
             alg_draw_red_location(&img->location, &cnt->imgs, cnt->imgs.width, cnt->imgs.preview_image.image,
-                                  LOCATE_REDBOX, LOCATE_NORMAL, cnt->process_thisframe, 0);
+                                  LOCATE_REDBOX, LOCATE_NORMAL, cnt->process_thisframe, cnt->imgs.preview_image.total_labels);
         } else if (cnt->locate_motion_style == LOCATE_CROSS) {
             alg_draw_location(&img->location, &cnt->imgs, cnt->imgs.width, cnt->imgs.preview_image.image,
                               LOCATE_CROSS, LOCATE_NORMAL, cnt->process_thisframe, cnt->imgs.preview_image.total_labels);
@@ -418,10 +418,10 @@ static void motion_detected(struct context *cnt, int dev, struct image_data *img
     if (cnt->locate_motion_mode == LOCATE_ON) {
         if (cnt->locate_motion_style == LOCATE_BOX) {
             alg_draw_location(location, imgs, imgs->width, img->image, LOCATE_BOX,
-                              LOCATE_BOTH, cnt->process_thisframe, 0);
+                              LOCATE_BOTH, cnt->process_thisframe, img->total_labels);
         } else if (cnt->locate_motion_style == LOCATE_REDBOX) {
             alg_draw_red_location(location, imgs, imgs->width, img->image, LOCATE_REDBOX,
-                                  LOCATE_BOTH, cnt->process_thisframe, 0);
+                                  LOCATE_BOTH, cnt->process_thisframe, img->total_labels);
         } else if (cnt->locate_motion_style == LOCATE_CROSS) {
             alg_draw_location(location, imgs, imgs->width, img->image, LOCATE_CROSS, 
                               LOCATE_BOTH, cnt->process_thisframe, img->total_labels);

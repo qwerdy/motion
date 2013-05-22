@@ -284,9 +284,17 @@ int initialize_chars(void);
 
 #define MAX_LABELS   50
 
-/* Stores each labels center x, y and point count. */
+/*  Stores information about each label. 
+ *  TODO: use alg.h coord instead ...
+ */
 struct label_center{
-    int x, y, c;
+    int x;
+    int y;
+    int c;
+    int minx;
+    int maxx;
+    int miny;
+    int maxy;
 };
 
 struct images {

@@ -26,46 +26,75 @@ void alg_locate_center_size(struct images *imgs, int width, int height, struct c
     unsigned char *out = imgs->out;
     int *labels = imgs->labels;
     int x, y, l, centc = 0, xdist = 0, ydist = 0;
-    struct label_center (*labels_all)[MAX_LABELS] = &imgs->labels_all;
-
-    memset(*labels_all, 0, sizeof(*labels_all));
-
-    cent->x = 0;
-    cent->y = 0;
-    cent->maxx = 0;
-    cent->maxy = 0;
-    cent->minx = width;
-    cent->miny = height;
+    struct label_center *label_coord = imgs->labels_all;
 
     /* If Labeling enabled - locate center of all labels. */
     if (tot_labels) {
-        /* Locate largest labelgroup */
+
+        for (x = 0; x < tot_labels; x++) {
+            label_coord[x].x = 0;
+            label_coord[x].y = 0;
+            label_coord[x].c = 0;
+            label_coord[x].minx = width;
+            label_coord[x].maxx = 0;
+            label_coord[x].miny = height;
+            label_coord[x].maxy = 0;
+        }
+
         for (y = 0; y < height; y++) {
             for (x = 0; x < width; x++) {
                 /* Check for valid label */
                 if (*labels & 32768) {
                     /* Find the label number */
-                    int label_pos = (*labels ^ 32768);
-                    (*labels_all)[label_pos].x += x;
-                    (*labels_all)[label_pos].y += y;
-                    (*labels_all)[label_pos].c++;
+                    int current_label = (*labels ^ 32768);
+
+                    label_coord[current_label].x += x;
+                    label_coord[current_label].y += y;
+                    label_coord[current_label].c++;
+
+                    if (label_coord[current_label].minx > x)
+                        label_coord[current_label].minx = x;
+                    if (label_coord[current_label].maxx < x)
+                        label_coord[current_label].maxx = x;
+                    if (label_coord[current_label].miny > y)
+                        label_coord[current_label].miny = y;
+                    if (label_coord[current_label].maxy < y)
+                        label_coord[current_label].maxy = y;
                 }
                 labels++;
             }
         }
 
+        /* Calculate center of all labels */
         for(l = 0; l < tot_labels; l++) {
-            if((*labels_all)[l].c) {
-                (*labels_all)[l].x = (*labels_all)[l].x / (*labels_all)[l].c;
-                (*labels_all)[l].y = (*labels_all)[l].y / (*labels_all)[l].c;
+            if(label_coord[l].c) {
+                label_coord[l].x = label_coord[l].x / label_coord[l].c;
+                label_coord[l].y = label_coord[l].y / label_coord[l].c;
             }
         }
-        //Set center to largest label, for box drawing.
-        if((*labels_all)[imgs->largest_label].c) {
-            cent->x = (*labels_all)[imgs->largest_label].x;
-            cent->y = (*labels_all)[imgs->largest_label].y;
+        /* Set cent to largest label,
+         * for box drawing / track moving / 3x3 detection / lightswitch ...
+         */
+        if(label_coord[imgs->largest_label].c) {
+            cent->x = label_coord[imgs->largest_label].x;
+            cent->y = label_coord[imgs->largest_label].y;
+            cent->maxx = label_coord[imgs->largest_label].maxx;
+            cent->maxy = label_coord[imgs->largest_label].maxy;
+            cent->minx = label_coord[imgs->largest_label].minx;
+            cent->miny = label_coord[imgs->largest_label].miny;
+            cent->width = label_coord[imgs->largest_label].maxx - label_coord[imgs->largest_label].minx;
+            cent->height = label_coord[imgs->largest_label].maxy - label_coord[imgs->largest_label].miny;
         }
+        /* No edge or head fixing*/
+        return;
     } else {
+        cent->x = 0;
+        cent->y = 0;
+        cent->maxx = 0;
+        cent->maxy = 0;
+        cent->minx = width;
+        cent->miny = height;
+
         /* Locate movement */
         for (y = 0; y < height; y++) {
             for (x = 0; x < width; x++) {
@@ -80,38 +109,15 @@ void alg_locate_center_size(struct images *imgs, int width, int height, struct c
             cent->x = cent->x / centc;
             cent->y = cent->y / centc;
         }
-    }
+
+        
+        /* Now we find the size of the Motion. */
+
+        /* First reset pointers back to initial value. */
+        centc = 0;
+        out = imgs->out;
 
 
-    
-    /* Now we find the size of the Motion. */
-
-    /* First reset pointers back to initial value. */
-    centc = 0;
-    labels = imgs->labels;
-    out = imgs->out;
-
-    /* If Labeling then we find the area around largest labelgroup instead. */
-    if (tot_labels) {
-        for (y = 0; y < height; y++) {
-            for (x = 0; x < width; x++) {
-                if (*(labels++) == 32768 + imgs->largest_label) {
-                    if (x > cent->x)
-                        xdist += x - cent->x;
-                    else if (x < cent->x)
-                        xdist += cent->x - x;
-
-                    if (y > cent->y)
-                        ydist += y - cent->y;
-                    else if (y < cent->y)
-                        ydist += cent->y - y;
-
-                    centc++;
-                }
-            }    
-        }
-
-    } else {
         for (y = 0; y < height; y++) {
             for (x = 0; x < width; x++) {
                 if (*(out++)) {
@@ -129,19 +135,18 @@ void alg_locate_center_size(struct images *imgs, int width, int height, struct c
                 }
             }    
         }
-
-    }
-    
-    if (centc) {
-        cent->minx = cent->x - xdist / centc * 2;
-        cent->maxx = cent->x + xdist / centc * 2;
-        /* 
-         * Make the box a little bigger in y direction to make sure the
-         * heads fit in so we multiply by 3 instead of 2 which seems to
-         * to work well in practical. 
-         */
-        cent->miny = cent->y - ydist / centc * 3;
-        cent->maxy = cent->y + ydist / centc * 2;
+        
+        if (centc) {
+            cent->minx = cent->x - xdist / centc * 2;
+            cent->maxx = cent->x + xdist / centc * 2;
+            /* 
+             * Make the box a little bigger in y direction to make sure the
+             * heads fit in so we multiply by 3 instead of 2 which seems to
+             * to work well in practical. 
+             */
+            cent->miny = cent->y - ydist / centc * 3;
+            cent->maxy = cent->y + ydist / centc * 2;
+        }
     }
 
     if (cent->maxx > width - 1)
@@ -180,6 +185,13 @@ void alg_locate_center_size(struct images *imgs, int width, int height, struct c
      */
     cent->y = (cent->miny + cent->maxy) / 2;
     
+    /* Set as first label, so drawing box/cross will work */
+    imgs->labels_all[0].x = cent->x;
+    imgs->labels_all[0].y = cent->y;
+    imgs->labels_all[0].minx = cent->minx;
+    imgs->labels_all[0].miny = cent->miny;
+    imgs->labels_all[0].maxy = cent->maxy;
+    imgs->labels_all[0].miny = cent->miny;
 }
 
 
@@ -192,6 +204,10 @@ void alg_draw_location(struct coord *cent, struct images *imgs, int width, unsig
 {
     unsigned char *out = imgs->out;
     int x, y;
+
+    /* If label is not used, draw cent/coord stored in first position */
+    if (!tot_labels)
+        tot_labels = 1;
 
     out = imgs->out;
 
@@ -217,23 +233,29 @@ void alg_draw_location(struct coord *cent, struct images *imgs, int width, unsig
         }
     }
     if (style == LOCATE_BOX) { /* Draw a box on normal images. */
-        int width_miny = width * cent->miny;
-        int width_maxy = width * cent->maxy;
+        int l;
+        struct label_center *current_label = imgs->labels_all;
 
-        for (x = cent->minx; x <= cent->maxx; x++) {
-            int width_miny_x = x + width_miny;
-            int width_maxy_x = x + width_maxy;
+        for(l = 0; l < tot_labels; l++) {
+            int width_miny = width * current_label->miny;
+            int width_maxy = width * current_label->maxy;
 
-            new[width_miny_x] =~new[width_miny_x];
-            new[width_maxy_x] =~new[width_maxy_x];
-        }
+            for (x = current_label->minx; x <= current_label->maxx; x++) {
+                int width_miny_x = x + width_miny;
+                int width_maxy_x = x + width_maxy;
 
-        for (y = cent->miny; y <= cent->maxy; y++) {
-            int width_minx_y = cent->minx + y * width; 
-            int width_maxx_y = cent->maxx + y * width;
+                new[width_miny_x] =~new[width_miny_x];
+                new[width_maxy_x] =~new[width_maxy_x];
+            }
 
-            new[width_minx_y] =~new[width_minx_y];
-            new[width_maxx_y] =~new[width_maxx_y];
+            for (y = current_label->miny; y <= current_label->maxy; y++) {
+                int width_minx_y = current_label->minx + y * width; 
+                int width_maxx_y = current_label->maxx + y * width;
+
+                new[width_minx_y] =~new[width_minx_y];
+                new[width_maxx_y] =~new[width_maxx_y];
+            }
+            current_label++;
         }
     } else if (style == LOCATE_CROSS) { /* Draw a cross on normal images. */
         /* Draw cross on each label */
@@ -270,6 +292,10 @@ void alg_draw_red_location(struct coord *cent, struct images *imgs, int width, u
     unsigned char *new_u, *new_v;
     int x, y, v, cwidth, cblock;
 
+    /* If label is not used, draw cent/coord stored in first position */
+    if (!tot_labels)
+        tot_labels = 1;
+
     cwidth = width / 2;
     cblock = imgs->motionsize / 4;
     x = imgs->motionsize;
@@ -300,57 +326,63 @@ void alg_draw_red_location(struct coord *cent, struct images *imgs, int width, u
     }
 
     if (style == LOCATE_REDBOX) { /* Draw a red box on normal images. */
-        int width_miny = width * cent->miny;
-        int width_maxy = width * cent->maxy;
-        int cwidth_miny = cwidth * (cent->miny / 2);
-        int cwidth_maxy = cwidth * (cent->maxy / 2);
-        
-        for (x = cent->minx + 2; x <= cent->maxx - 2; x += 2) {
-            int width_miny_x = x + width_miny;
-            int width_maxy_x = x + width_maxy;
-            int cwidth_miny_x = x / 2 + cwidth_miny;
-            int cwidth_maxy_x = x / 2 + cwidth_maxy;
+        int l;
+        struct label_center *current_label = imgs->labels_all;
 
-            new_u[cwidth_miny_x] = 128;
-            new_u[cwidth_maxy_x] = 128;
-            new_v[cwidth_miny_x] = 255;
-            new_v[cwidth_maxy_x] = 255;
+        for(l = 0; l < tot_labels; l++) {
+            int width_miny = width * current_label->miny;
+            int width_maxy = width * current_label->maxy;
+            int cwidth_miny = cwidth * (current_label->miny / 2);
+            int cwidth_maxy = cwidth * (current_label->maxy / 2);
+            
+            for (x = current_label->minx + 2; x <= current_label->maxx - 2; x += 2) {
+                int width_miny_x = x + width_miny;
+                int width_maxy_x = x + width_maxy;
+                int cwidth_miny_x = x / 2 + cwidth_miny;
+                int cwidth_maxy_x = x / 2 + cwidth_maxy;
 
-            new[width_miny_x] = 128;
-            new[width_maxy_x] = 128;
+                new_u[cwidth_miny_x] = 128;
+                new_u[cwidth_maxy_x] = 128;
+                new_v[cwidth_miny_x] = 255;
+                new_v[cwidth_maxy_x] = 255;
 
-            new[width_miny_x + 1] = 128;
-            new[width_maxy_x + 1] = 128;
+                new[width_miny_x] = 128;
+                new[width_maxy_x] = 128;
 
-            new[width_miny_x + width] = 128;
-            new[width_maxy_x + width] = 128;
+                new[width_miny_x + 1] = 128;
+                new[width_maxy_x + 1] = 128;
 
-            new[width_miny_x + 1 + width] = 128;
-            new[width_maxy_x + 1 + width] = 128;
-        }
+                new[width_miny_x + width] = 128;
+                new[width_maxy_x + width] = 128;
 
-        for (y = cent->miny; y <= cent->maxy; y += 2) {
-            int width_minx_y = cent->minx + y * width; 
-            int width_maxx_y = cent->maxx + y * width;
-            int cwidth_minx_y = (cent->minx / 2) + (y / 2) * cwidth; 
-            int cwidth_maxx_y = (cent->maxx / 2) + (y / 2) * cwidth;
+                new[width_miny_x + 1 + width] = 128;
+                new[width_maxy_x + 1 + width] = 128;
+            }
 
-            new_u[cwidth_minx_y] = 128;
-            new_u[cwidth_maxx_y] = 128;
-            new_v[cwidth_minx_y] = 255;
-            new_v[cwidth_maxx_y] = 255;
+            for (y = current_label->miny; y <= current_label->maxy; y += 2) {
+                int width_minx_y = current_label->minx + y * width; 
+                int width_maxx_y = current_label->maxx + y * width;
+                int cwidth_minx_y = (current_label->minx / 2) + (y / 2) * cwidth; 
+                int cwidth_maxx_y = (current_label->maxx / 2) + (y / 2) * cwidth;
 
-            new[width_minx_y] = 128;
-            new[width_maxx_y] = 128;
+                new_u[cwidth_minx_y] = 128;
+                new_u[cwidth_maxx_y] = 128;
+                new_v[cwidth_minx_y] = 255;
+                new_v[cwidth_maxx_y] = 255;
 
-            new[width_minx_y + width] = 128;
-            new[width_maxx_y + width] = 128;
+                new[width_minx_y] = 128;
+                new[width_maxx_y] = 128;
 
-            new[width_minx_y + 1] = 128;
-            new[width_maxx_y + 1] = 128;
+                new[width_minx_y + width] = 128;
+                new[width_maxx_y + width] = 128;
 
-            new[width_minx_y + width + 1] = 128;
-            new[width_maxx_y + width + 1] = 128;
+                new[width_minx_y + 1] = 128;
+                new[width_maxx_y + 1] = 128;
+
+                new[width_minx_y + width + 1] = 128;
+                new[width_maxx_y + width + 1] = 128;
+            }
+            current_label++;
         }
     } else if (style == LOCATE_REDCROSS) { /* Draw a red cross on normal images. */
 
