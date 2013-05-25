@@ -73,7 +73,7 @@ void alg_locate_center_size(struct images *imgs, int width, int height, struct c
             }
         }
         /* Set cent to largest label,
-         * for box drawing / track moving / 3x3 detection / lightswitch ...
+         * for track moving / 3x3 detection / lightswitch ...
          */
         if(label_coord[imgs->largest_label].c) {
             cent->x = label_coord[imgs->largest_label].x;
@@ -110,8 +110,6 @@ void alg_locate_center_size(struct images *imgs, int width, int height, struct c
             cent->y = cent->y / centc;
         }
 
-        
-        /* Now we find the size of the Motion. */
 
         /* First reset pointers back to initial value. */
         centc = 0;

@@ -9,6 +9,7 @@ Features
 Bugfixes
    * Moved some netcam logging to DBG level (mterzo / d2d31e6)
    * Set motion capture thread running in the main thread (dfries / bda3dec)
+   * Fix webhttpd race condition crash with SIGHUP, add it to running thread counter (dfries / 55a8261)
 
 SVN trunk Summary of Changes
 
@@ -94,7 +95,6 @@ Bugfixes
    * Avoid segfault when text_left or text_right uses non supported chars.
    * Fixed leak in vloopback.
    * Fixed a build of motion for some kernel version with not good videodev.h 
-   * Fix webhttpd race condition crash with SIGHUP, add it to running thread counter (David Fries)
 
 3.2.12 Summary of Changes
 
