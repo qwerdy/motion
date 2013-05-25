@@ -1,3 +1,15 @@
+GIT changes from github.com/qwerdy/motion
+
+Features
+   * Draw cross/box on multiple moving objects, not just the largest one
+   * Select multiple log-types, not just one or all
+   * Added option to disable motion detection in config
+   * Change log-level log-type while motion is running
+
+Bugfixes
+   * Moved some netcam logging to DBG level (mterzo / d2d31e6)
+   * Set motion capture thread running in the main thread (dfries / bda3dec)
+
 SVN trunk Summary of Changes
 
 Features
