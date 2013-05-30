@@ -188,8 +188,8 @@ void alg_locate_center_size(struct images *imgs, int width, int height, struct c
     imgs->labels_all[0].y = cent->y;
     imgs->labels_all[0].minx = cent->minx;
     imgs->labels_all[0].miny = cent->miny;
+    imgs->labels_all[0].maxx = cent->maxx;
     imgs->labels_all[0].maxy = cent->maxy;
-    imgs->labels_all[0].miny = cent->miny;
 }
 
 
