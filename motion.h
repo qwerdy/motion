@@ -295,6 +295,7 @@ struct label_center{
     int maxx;
     int miny;
     int maxy;
+    int is_sub_box;
 };
 
 struct images {

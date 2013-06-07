@@ -39,6 +39,7 @@ void alg_locate_center_size(struct images *imgs, int width, int height, struct c
             label_coord[x].maxx = 0;
             label_coord[x].miny = height;
             label_coord[x].maxy = 0;
+            label_coord[x].is_sub_box = 0;
         }
 
         for (y = 0; y < height; y++) {
@@ -65,11 +66,28 @@ void alg_locate_center_size(struct images *imgs, int width, int height, struct c
             }
         }
 
-        /* Calculate center of all labels */
-        for(l = 0; l < tot_labels; l++) {
+        for(l = 0; l < tot_labels; ++l) {
+            /* Calculate center of all labels */
             if(label_coord[l].c) {
                 label_coord[l].x = label_coord[l].x / label_coord[l].c;
                 label_coord[l].y = label_coord[l].y / label_coord[l].c;
+            }
+
+            /* Merge overlapping boxes */
+            for(x = 0; x < tot_labels; ++x) {
+                if(label_coord[x].is_sub_box || x == l)
+                    continue;
+
+                if(MAX(label_coord[l].minx, label_coord[x].minx) < MIN(label_coord[l].maxx, label_coord[x].maxx) &&
+                    MAX(label_coord[l].miny, label_coord[x].miny) < MIN(label_coord[l].maxy, label_coord[x].maxy)) 
+                    {
+                        label_coord[x].minx = MIN(label_coord[l].minx, label_coord[x].minx);
+                        label_coord[x].maxx = MAX(label_coord[l].maxx, label_coord[x].maxx);
+                        label_coord[x].miny = MIN(label_coord[l].miny, label_coord[x].miny);
+                        label_coord[x].maxy = MAX(label_coord[l].maxy, label_coord[x].maxy);
+
+                        label_coord[l].is_sub_box = 1;
+                    }
             }
         }
         /* Set cent to largest label,
@@ -235,6 +253,10 @@ void alg_draw_location(struct coord *cent, struct images *imgs, int width, unsig
         struct label_center *current_label = imgs->labels_all;
 
         for(l = 0; l < tot_labels; l++) {
+            if(current_label->is_sub_box) {
+                current_label++;
+                continue;
+            }
             int width_miny = width * current_label->miny;
             int width_maxy = width * current_label->maxy;
 
@@ -328,6 +350,10 @@ void alg_draw_red_location(struct coord *cent, struct images *imgs, int width, u
         struct label_center *current_label = imgs->labels_all;
 
         for(l = 0; l < tot_labels; l++) {
+            if(current_label->is_sub_box) {
+                current_label++;
+                continue;
+            }
             int width_miny = width * current_label->miny;
             int width_maxy = width * current_label->maxy;
             int cwidth_miny = cwidth * (current_label->miny / 2);
