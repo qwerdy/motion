@@ -87,6 +87,7 @@ void alg_locate_center_size(struct images *imgs, int width, int height, struct c
                         label_coord[x].maxy = MAX(label_coord[l].maxy, label_coord[x].maxy);
 
                         label_coord[l].is_sub_box = 1;
+                        continue;
                     }
             }
         }
