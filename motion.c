@@ -2498,6 +2498,8 @@ static void motion_startup(int daemonize, int argc, char *argv[])
             cnt_list[0]->log_type = TYPE_DEFAULT;
             MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO, "%s: Using default log type (%s)",  
                         get_log_type_str(cnt_list[0]->log_type));
+    } else {
+        cnt_list[0]->log_type = cnt_list[0]->conf.log_type;
     }
 
     MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO, "%s: Using log type (%s) log level (%s)", 

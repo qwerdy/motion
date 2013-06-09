@@ -45,7 +45,9 @@ const char* get_log_type_str(unsigned int type)
 void set_log_type(unsigned int type)
 {  
     log_type = type;
-    log_type_flag = 0;
+
+    /* Always show TYPE_ALL log messages */
+    log_type_flag = 1<<9;
 
     char buffer[8];
     snprintf(buffer, 8, "%i", type);
