@@ -1600,7 +1600,7 @@ static void *motion_loop(void *arg)
              * If we are not noise tuning lets make sure that remote controlled
              * changes of noise_level are used.
              */
-            if (cnt->process_thisframe) {
+            if (cnt->process_thisframe && (!cnt->conf.disable_detection || cnt->conf.setup_mode)) {
                 if (!cnt->conf.noise_tune)
                     cnt->noise = cnt->conf.noise;
 
