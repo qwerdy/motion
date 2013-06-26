@@ -1628,6 +1628,8 @@ static void *motion_loop(void *arg)
                  * frontdoor illumination. Updates are rate-limited to 3 per second at   
                  * framerates above 5fps to save CPU resources and to keep sensitivity   
                  * at a constant level.                                                  
+                 * If not triggering micro-lightswitch, limit dynamic updates to
+                 * once per second, if no motion is detected.
                  */
 
                 if ((cnt->current_image->diffs > cnt->threshold) && (cnt->conf.lightswitch == 1) &&
@@ -1642,7 +1644,7 @@ static void *motion_loop(void *arg)
                     cnt->lightswitch_framecounter = 0;
 
                     MOTION_LOG(INF, TYPE_ALL, NO_ERRNO, "%s: micro-lightswitch!"); 
-                } else {
+                } else if (cnt->detecting_motion || cnt->shots == 0){
                     alg_update_reference_frame(cnt, UPDATE_REF_FRAME);
                 }
 
