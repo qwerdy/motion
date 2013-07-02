@@ -941,7 +941,8 @@ int alg_despeckle(struct context *cnt, int olddiffs)
             break;
         /* No further despeckle after labeling! */
         case 'l':
-            diffs = alg_labeling(cnt);
+            if(diffs > cnt->threshold)
+                diffs = alg_labeling(cnt);
             i = len;
             done = 2;
             break;
