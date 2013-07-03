@@ -443,29 +443,41 @@ void alg_draw_red_location(struct coord *cent, struct images *imgs, int width, u
 void alg_noise_tune(struct context *cnt, unsigned char *new)
 {
     struct images *imgs = &cnt->imgs;
-    int i;
     unsigned char *ref = imgs->ref;
-    int diff, sum = 0, count = 0;
+    int diff, x, y, sum = 0, count = 0;
     unsigned char *mask = imgs->mask;
     unsigned char *smartmask = imgs->smartmask_final;
 
-    i = imgs->motionsize;
+    int width = imgs->width;
+    int height = imgs->height;
+    int down_scale;
+    int i = imgs->motionsize;
+    int u_size = i / 4;
+
             
-    for (; i > 0; i--) {
-        diff = ABS(*ref - *new);
+    for (y = 0; y < height; y++)
+        for (x = 0; x < width; x++) {
+            /* Y */
+            diff = ABS(*ref - *new);
+            down_scale = ((y/2) * (width/2)) + x/2;
+            /* U */
+            diff += ABS(*(ref+i+down_scale) - *(new+i+down_scale));
+            /* V */
+            diff += ABS(*(ref+i+down_scale+u_size) - *(new+i+down_scale+u_size));
 
-        if (mask)
-            diff = ((diff * *mask++) / 255);
+            if (mask)
+                diff = ((diff * *mask++) / 255);
 
-        if (*smartmask) {
-            sum += diff + 1;
-            count++;
+            if (*smartmask) {
+                sum += diff + 1;
+                count++;
+            }
+
+            ref++;
+            new++;
+            smartmask++;
+            i--;
         }
-
-        ref++;
-        new++;
-        smartmask++;
-    }
 
     if (count > 3)  /* Avoid divide by zero. */
         sum /= count / 3;
@@ -1006,8 +1018,10 @@ void alg_tune_smartmask(struct context *cnt)
 int alg_diff_standard(struct context *cnt, unsigned char *new)
 {
     struct images *imgs = &cnt->imgs;
-    int i, diffs = 0;
+    int x, y, diffs = 0;
     int noise = cnt->noise;
+    int width = imgs->width;
+    int height = imgs->height;
     int smartmask_speed = cnt->smartmask_speed;
     unsigned char *ref = imgs->ref;
     unsigned char *out = imgs->out;
@@ -1015,43 +1029,55 @@ int alg_diff_standard(struct context *cnt, unsigned char *new)
     unsigned char *smartmask_final = imgs->smartmask_final;
     int *smartmask_buffer = imgs->smartmask_buffer;
 
-    i = imgs->motionsize;
+    int i = imgs->motionsize;
+    int u_size = i / 4;
+
     memset(out + i, 128, i / 2); /* Motion pictures are now b/w i.o. green */
     memset(out, 0, i);
 
-    for (; i > 0; i--) {
-        register unsigned char curdiff = (int)(abs(*ref - *new)); /* Using a temp variable is 12% faster. */
-        /* Apply fixed mask */
-        if (mask)
-            curdiff = ((int)(curdiff * *mask++) / 255);
-            
-        if (smartmask_speed) {
-            if (curdiff > noise) {
-                /* 
-                 * Increase smart_mask sensitivity every frame when motion
-                 * is detected. (with speed=5, mask is increased by 1 every
-                 * second. To be able to increase by 5 every second (with
-                 * speed=10) we add 5 here. NOT related to the 5 at ratio-
-                 * calculation. 
-                 */
-                if (cnt->event_nr != cnt->prev_event)
-                    (*smartmask_buffer) += SMARTMASK_SENSITIVITY_INCR;
-                /* Apply smart_mask */
-                if (!*smartmask_final)
-                    curdiff = 0;
+    for (y = 0; y < height; y++)
+        for (x = 0; x < width; x++) {
+            /* Y diff */
+            int curdiff = abs(*ref - *new);
+
+            int down_scale = ((y/2) * (width/2)) + x/2;
+            /* U diff */
+            curdiff += abs(*(ref+i+down_scale) - *(new+i+down_scale));
+            /* V diff */
+            curdiff += abs(*(ref+i+down_scale+u_size) - *(new+i+down_scale+u_size));
+
+            /* Apply fixed mask */
+            if (mask)
+                curdiff = (curdiff * *mask++) / 255;
+                
+            if (smartmask_speed) {
+                if (curdiff > noise) {
+                    /* 
+                     * Increase smart_mask sensitivity every frame when motion
+                     * is detected. (with speed=5, mask is increased by 1 every
+                     * second. To be able to increase by 5 every second (with
+                     * speed=10) we add 5 here. NOT related to the 5 at ratio-
+                     * calculation. 
+                     */
+                    if (cnt->event_nr != cnt->prev_event)
+                        (*smartmask_buffer) += SMARTMASK_SENSITIVITY_INCR;
+                    /* Apply smart_mask */
+                    if (!*smartmask_final)
+                        curdiff = 0;
+                }
+                smartmask_final++;
+                smartmask_buffer++;
             }
-            smartmask_final++;
-            smartmask_buffer++;
+            /* Pixel still in motion after all the masks? */
+            if (curdiff > noise) {
+                *out = *new;
+                diffs++;
+            }
+            out++;
+            ref++;
+            new++;
+            i--;
         }
-        /* Pixel still in motion after all the masks? */
-        if (curdiff > noise) {
-            *out = *new;
-            diffs++;
-        }
-        out++;
-        ref++;
-        new++;
-    }
     return diffs;
 }
 
@@ -1192,7 +1218,7 @@ void alg_update_reference_frame(struct context *cnt, int action)
     if (action == UPDATE_REF_FRAME) { /* Black&white only for better performance. */
         threshold_ref = cnt->noise * EXCLUDE_LEVEL_PERCENT / 100;
 
-        for (i = cnt->imgs.motionsize; i > 0; i--) {
+        for (i = cnt->imgs.size; i > 0; i--) {
             /* Exclude pixels from ref frame well below noise level. */
             if (((int)(abs(*ref - *image_virgin)) > threshold_ref) && (*smartmask)) {
                 if (*ref_dyn == 0) { /* Always give new pixels a chance. */
@@ -1223,6 +1249,6 @@ void alg_update_reference_frame(struct context *cnt, int action)
         /* Copy fresh image */
         memcpy(cnt->imgs.ref, cnt->imgs.image_virgin, cnt->imgs.size);
         /* Reset static objects */
-        memset(cnt->imgs.ref_dyn, 0, cnt->imgs.motionsize * sizeof(cnt->imgs.ref_dyn)); 
+        memset(cnt->imgs.ref_dyn, 0, cnt->imgs.size * sizeof(cnt->imgs.ref_dyn)); 
     }
 }
