@@ -953,6 +953,8 @@ unsigned char *get_pgm(FILE *picture, int width, int height)
     int x = 0 , y = 0, maxval;
     char line[256];
     unsigned char *image;
+    unsigned char *u_offset;
+    unsigned char *v_offset;
 
     line[255] = 0;
 
@@ -998,7 +1000,7 @@ unsigned char *get_pgm(FILE *picture, int width, int height)
 
     /* Read data */
 
-    image = mymalloc(width * height);
+    image = mymalloc(width * height * 3 / 2);
 
     for (y = 0; y < height; y++) {
         if ((int)fread(&image[y * width], 1, width, picture) != width)
@@ -1007,6 +1009,19 @@ unsigned char *get_pgm(FILE *picture, int width, int height)
         for (x = 0; x < width; x++)
             image[y * width + x] = (int)image[y * width + x] * 255 / maxval;
 
+    }
+
+
+    u_offset = image + (width*height);
+    v_offset = u_offset + (width*height / 4);
+
+    /* Copy a down scaled image into U and V */
+    for (y = 0; y < height; y+=2) {
+        for (x = 0; x < width; x+=2) {
+            u_offset[y/2 * width/2 + x/2] = 
+            v_offset[y/2 * width/2 + x/2] = 
+                ((int)image[y * width + x] + image[y * width + x + 1] + image[y * width + width + x] + image[y * width + width + x + 1]) / 4;
+        }
     }
 
     return image;

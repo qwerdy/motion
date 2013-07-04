@@ -723,11 +723,11 @@ static int motion_init(struct context *cnt)
     memset(cnt->imgs.out, 0, cnt->imgs.size);
 
     /* contains the moving objects of ref. frame */
-    cnt->imgs.ref_dyn = mymalloc(cnt->imgs.motionsize * sizeof(cnt->imgs.ref_dyn));
+    cnt->imgs.ref_dyn = mymalloc(cnt->imgs.size * sizeof(cnt->imgs.ref_dyn));
     cnt->imgs.image_virgin = mymalloc(cnt->imgs.size);
-    cnt->imgs.smartmask = mymalloc(cnt->imgs.motionsize);
-    cnt->imgs.smartmask_final = mymalloc(cnt->imgs.motionsize);
-    cnt->imgs.smartmask_buffer = mymalloc(cnt->imgs.motionsize * sizeof(cnt->imgs.smartmask_buffer));
+    cnt->imgs.smartmask = mymalloc(cnt->imgs.size);
+    cnt->imgs.smartmask_final = mymalloc(cnt->imgs.size);
+    cnt->imgs.smartmask_buffer = mymalloc(cnt->imgs.size * sizeof(cnt->imgs.smartmask_buffer));
     cnt->imgs.labels = mymalloc(cnt->imgs.motionsize * sizeof(cnt->imgs.labels));
 
     /* Set output picture type */
@@ -914,9 +914,9 @@ static int motion_init(struct context *cnt)
     }
 
     /* Always initialize smart_mask - someone could turn it on later... */
-    memset(cnt->imgs.smartmask, 0, cnt->imgs.motionsize);
-    memset(cnt->imgs.smartmask_final, 255, cnt->imgs.motionsize);
-    memset(cnt->imgs.smartmask_buffer, 0, cnt->imgs.motionsize*sizeof(cnt->imgs.smartmask_buffer));
+    memset(cnt->imgs.smartmask, 0, cnt->imgs.size);
+    memset(cnt->imgs.smartmask_final, 255, cnt->imgs.size);
+    memset(cnt->imgs.smartmask_buffer, 0, cnt->imgs.size*sizeof(cnt->imgs.smartmask_buffer));
 
     /* Set noise level */
     cnt->noise = cnt->conf.noise;
@@ -2156,8 +2156,8 @@ static void *motion_loop(void *arg)
             if (cnt->conf.smart_mask_speed != cnt->smartmask_speed || 
                 smartmask_lastrate != cnt->lastrate) {
                 if (cnt->conf.smart_mask_speed == 0) {
-                    memset(cnt->imgs.smartmask, 0, cnt->imgs.motionsize);
-                    memset(cnt->imgs.smartmask_final, 255, cnt->imgs.motionsize);
+                    memset(cnt->imgs.smartmask, 0, cnt->imgs.size);
+                    memset(cnt->imgs.smartmask_final, 255, cnt->imgs.size);
                 }
 
                 smartmask_lastrate = cnt->lastrate;

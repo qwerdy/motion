@@ -449,7 +449,7 @@ void alg_noise_tune(struct context *cnt, unsigned char *new)
     unsigned char *mask = imgs->mask;
     unsigned char *smartmask = imgs->smartmask_final;
 
-    i = imgs->motionsize;
+    i = imgs->size;
             
     for (; i > 0; i--) {
         diff = ABS(*ref - *new);
@@ -963,13 +963,13 @@ int alg_despeckle(struct context *cnt, int olddiffs)
 void alg_tune_smartmask(struct context *cnt)
 {
     int i, diff;
-    int motionsize = cnt->imgs.motionsize;
+    int size = cnt->imgs.size;
     unsigned char *smartmask = cnt->imgs.smartmask;
     unsigned char *smartmask_final = cnt->imgs.smartmask_final;
     int *smartmask_buffer = cnt->imgs.smartmask_buffer;
     int sensitivity = cnt->lastrate * (11 - cnt->smartmask_speed);
 
-    for (i = 0; i < motionsize; i++) {
+    for (i = size; i > 0; i--) {
         /* Decrease smart_mask sensitivity every 5*speed seconds only. */
         if (smartmask[i] > 0)
             smartmask[i]--;
@@ -1006,7 +1006,9 @@ void alg_tune_smartmask(struct context *cnt)
 int alg_diff_standard(struct context *cnt, unsigned char *new)
 {
     struct images *imgs = &cnt->imgs;
-    int i, diffs = 0;
+    int i, size, diffs = 0;
+    int line = imgs->width;
+    int uv_line = line / 2;
     int noise = cnt->noise;
     int smartmask_speed = cnt->smartmask_speed;
     unsigned char *ref = imgs->ref;
@@ -1019,7 +1021,7 @@ int alg_diff_standard(struct context *cnt, unsigned char *new)
     memset(out + i, 128, i / 2); /* Motion pictures are now b/w i.o. green */
     memset(out, 0, i);
 
-    for (; i > 0; i--) {
+    for (size = 0; size < imgs->size; size++) {
         register unsigned char curdiff = (int)(abs(*ref - *new)); /* Using a temp variable is 12% faster. */
         /* Apply fixed mask */
         if (mask)
@@ -1043,11 +1045,44 @@ int alg_diff_standard(struct context *cnt, unsigned char *new)
             smartmask_final++;
             smartmask_buffer++;
         }
-        /* Pixel still in motion after all the masks? */
-        if (curdiff > noise) {
-            *out = *new;
-            diffs++;
+
+        /* Y */
+        if (size < imgs->motionsize) {           
+            if (curdiff > noise) {
+                *out = *new;
+                diffs++;
+            }
         }
+        /* U and V */
+        else {
+            /* We use a lower noise barrier for U and V */
+            if (curdiff > noise / 2) {
+                *out = *new;
+                diffs++;
+
+                /* For every pixel in U and V, we need to mark 4 in Y
+                 * We OR with 1 so iflood will label it in Y, even when theres no diff in Y.
+                 */
+                imgs->out[size - i]            |= 1;
+                imgs->out[size - i + 1]        |= 1;
+                imgs->out[size - i + line]     |= 1;
+                imgs->out[size - i + line + 1] |= 1;
+            }
+
+            /* every other line in Y */
+            if(!--uv_line) {
+                uv_line = line / 2;
+                i -= line;
+            }
+
+            /* Every other pixel in Y */
+            i--;
+
+            /* If going from U to V, reset value of i */
+            if(size == imgs->motionsize * 5 / 4) {
+                i = size;
+            }
+        } 
         out++;
         ref++;
         new++;
@@ -1062,7 +1097,7 @@ int alg_diff_standard(struct context *cnt, unsigned char *new)
 static char alg_diff_fast(struct context *cnt, int max_n_changes, unsigned char *new)
 {
     struct images *imgs = &cnt->imgs;
-    int i, diffs = 0, step = imgs->motionsize/10000;
+    int i, diffs = 0, step = imgs->size/10000;
     int noise = cnt->noise;
     unsigned char *ref = imgs->ref;
 
@@ -1071,7 +1106,7 @@ static char alg_diff_fast(struct context *cnt, int max_n_changes, unsigned char 
     /* We're checking only 1 of several pixels. */
     max_n_changes /= step;
 
-    i = imgs->motionsize;
+    i = imgs->size;
 
     for (; i > 0; i -= step) {
         register unsigned char curdiff = (int)(abs((char)(*ref - *new))); /* Using a temp variable is 12% faster. */
@@ -1118,7 +1153,7 @@ int alg_lightswitch(struct context *cnt, int diffs)
         cnt->conf.lightswitch = 100;
     
     /* Is lightswitch percent of the image changed? */
-    if (diffs > (imgs->motionsize * cnt->conf.lightswitch / 100))
+    if (diffs > (imgs->size / 100 * cnt->conf.lightswitch))
         return 1;
     
     return 0;
@@ -1192,7 +1227,7 @@ void alg_update_reference_frame(struct context *cnt, int action)
     if (action == UPDATE_REF_FRAME) { /* Black&white only for better performance. */
         threshold_ref = cnt->noise * EXCLUDE_LEVEL_PERCENT / 100;
 
-        for (i = cnt->imgs.motionsize; i > 0; i--) {
+        for (i = cnt->imgs.size; i > 0; i--) {
             /* Exclude pixels from ref frame well below noise level. */
             if (((int)(abs(*ref - *image_virgin)) > threshold_ref) && (*smartmask)) {
                 if (*ref_dyn == 0) { /* Always give new pixels a chance. */
@@ -1223,6 +1258,6 @@ void alg_update_reference_frame(struct context *cnt, int action)
         /* Copy fresh image */
         memcpy(cnt->imgs.ref, cnt->imgs.image_virgin, cnt->imgs.size);
         /* Reset static objects */
-        memset(cnt->imgs.ref_dyn, 0, cnt->imgs.motionsize * sizeof(cnt->imgs.ref_dyn)); 
+        memset(cnt->imgs.ref_dyn, 0, cnt->imgs.size * sizeof(cnt->imgs.ref_dyn)); 
     }
 }
